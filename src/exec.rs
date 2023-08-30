@@ -42,7 +42,25 @@ fn eval_ast(ast: &ASTNode, env: Rc<RefCell<Scope>>) -> Result<ASTNode, CompileEr
                     },
                 },
                 ASTNode::BinaryOp(op) => eval_operator(&op, l, env.clone()),
-                _ => Ok(ASTNode::Void),
+                ASTNode::Keyword(keyword) => eval_keyword(&keyword, l, env.clone()),
+                _ => {
+                    let mut nlist = Vec::new();
+
+                    for node in l.iter() {
+                        let val = eval_ast(node, env.clone())?;
+
+                        if val != ASTNode::Void {
+                            nlist.push(val)
+                        }
+                    }
+
+                    match &nlist[0] {
+                        ASTNode::Lambda(_, _, _) => {
+                            eval_ast(&ASTNode::List(Rc::new(nlist)), env.clone())
+                        }
+                        _ => Ok(ASTNode::List(Rc::new(nlist))),
+                    }
+                }
             }
         }
         _ => Err(CompileError::UnexpectedNode),
@@ -188,4 +206,38 @@ fn eval_operator(
         },
         _ => return Err(CompileError::UnsupportedOperator(op.to_string())),
     }
+}
+
+fn eval_keyword(
+    keyword: &str,
+    list: &Rc<Vec<ASTNode>>,
+    env: Rc<RefCell<Scope>>,
+) -> Result<ASTNode, CompileError> {
+    match keyword {
+        "print" => eval_print(list, env),
+        _ => {
+            return Err(CompileError::Syntax(format!(
+                "unknown keyword '{}'",
+                keyword
+            )))
+        }
+    }
+}
+
+fn eval_print(list: &Rc<Vec<ASTNode>>, env: Rc<RefCell<Scope>>) -> Result<ASTNode, CompileError> {
+    let mut res = Vec::new();
+
+    for ast in list[1..].iter() {
+        res.push(eval_ast(ast, env.clone())?);
+    }
+
+    let output = res
+        .iter()
+        .map(|ast| format!("{}", ast))
+        .collect::<Vec<String>>()
+        .join(" ");
+
+    println!("{}\n", output);
+
+    Ok(ASTNode::Void)
 }

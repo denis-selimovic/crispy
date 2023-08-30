@@ -79,7 +79,9 @@ pub fn lex(input: &str) -> Result<Vec<Lexem>, LexError> {
                         } else {
                             match s.as_str() {
                                 "define" | "list" | "print" | "lambda" | "car" | "cdr"
-                                | "length" | "null?" | "map" | "filter" => Lexem::Keyword(s),
+                                | "length" | "null?" | "map" | "filter" | "begin" => {
+                                    Lexem::Keyword(s)
+                                }
                                 "+" | "-" | "*" | "/" | "%" | "<" | ">" | "=" | "!=" | "or"
                                 | "and" => Lexem::BinaryOp(s),
                                 "if" => Lexem::If,
