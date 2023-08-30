@@ -214,7 +214,11 @@ fn eval_keyword(
     env: Rc<RefCell<Scope>>,
 ) -> Result<ASTNode, CompileError> {
     match keyword {
-        "print" => eval_print(list, env),
+        "print" => eval_print(list, env.clone()),
+        "car" => eval_car(list, env.clone()),
+        "cdr" => eval_cdr(list, env.clone()),
+        "length" => eval_length(list, env.clone()),
+        "null?" => eval_null(list, env.clone()),
         _ => {
             return Err(CompileError::Syntax(format!(
                 "unknown keyword '{}'",
@@ -240,4 +244,66 @@ fn eval_print(list: &Rc<Vec<ASTNode>>, env: Rc<RefCell<Scope>>) -> Result<ASTNod
     println!("{}\n", output);
 
     Ok(ASTNode::Void)
+}
+
+fn eval_car(list: &Rc<Vec<ASTNode>>, env: Rc<RefCell<Scope>>) -> Result<ASTNode, CompileError> {
+    if list.len() != 2 {
+        return Err(CompileError::Syntax(
+            "Invalid syntax for 'car' function".to_string(),
+        ));
+    }
+
+    let res = eval_ast(&list[1], env.clone())?;
+
+    match res {
+        ASTNode::DataList(l) => Ok(l[0].clone()),
+        _ => Err(CompileError::UnexpectedNode),
+    }
+}
+
+fn eval_cdr(list: &Rc<Vec<ASTNode>>, env: Rc<RefCell<Scope>>) -> Result<ASTNode, CompileError> {
+    if list.len() != 2 {
+        return Err(CompileError::Syntax(
+            "Invalid syntax for 'cdr' function".to_string(),
+        ));
+    }
+
+    let res = eval_ast(&list[1], env.clone())?;
+
+    match res {
+        ASTNode::DataList(l) => Ok(ASTNode::DataList(l[1..].to_vec())),
+        _ => Err(CompileError::UnexpectedNode),
+    }
+}
+
+fn eval_length(list: &Rc<Vec<ASTNode>>, env: Rc<RefCell<Scope>>) -> Result<ASTNode, CompileError> {
+    if list.len() != 2 {
+        return Err(CompileError::Syntax(
+            "Invalid syntax for 'length' function".to_string(),
+        ));
+    }
+
+    let res = eval_ast(&list[1], env.clone())?;
+
+    match res {
+        ASTNode::DataList(l) => Ok(ASTNode::Int(l.len() as i64)),
+        ASTNode::List(l) => Ok(ASTNode::Int(l.len() as i64)),
+        _ => Err(CompileError::UnexpectedNode),
+    }
+}
+
+fn eval_null(list: &Rc<Vec<ASTNode>>, env: Rc<RefCell<Scope>>) -> Result<ASTNode, CompileError> {
+    if list.len() != 2 {
+        return Err(CompileError::Syntax(
+            "Invalid syntax for 'null?' function".to_string(),
+        ));
+    }
+
+    let res = eval_ast(&list[1], env.clone())?;
+
+    match res {
+        ASTNode::DataList(l) => Ok(ASTNode::Bool(l.len() == 0)),
+        ASTNode::List(l) => Ok(ASTNode::Bool(l.len() == 0)),
+        _ => Err(CompileError::UnexpectedNode),
+    }
 }
