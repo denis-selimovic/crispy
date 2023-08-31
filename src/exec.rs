@@ -219,6 +219,12 @@ fn eval_keyword(
         "cdr" => eval_cdr(list, env.clone()),
         "length" => eval_length(list, env.clone()),
         "null?" => eval_null(list, env.clone()),
+        "list" => eval_list(list, env.clone()),
+        "lambda" => eval_lambda_def(list, env.clone()),
+        "map" => eval_map(list, env.clone()),
+        "filter" => eval_filter(list, env.clone()),
+        "begin" => eval_begin(list, env.clone()),
+        "define" => eval_define(list, env.clone()),
         _ => {
             return Err(CompileError::Syntax(format!(
                 "unknown keyword '{}'",
@@ -306,4 +312,180 @@ fn eval_null(list: &Rc<Vec<ASTNode>>, env: Rc<RefCell<Scope>>) -> Result<ASTNode
         ASTNode::List(l) => Ok(ASTNode::Bool(l.len() == 0)),
         _ => Err(CompileError::UnexpectedNode),
     }
+}
+
+fn eval_list(list: &Rc<Vec<ASTNode>>, env: Rc<RefCell<Scope>>) -> Result<ASTNode, CompileError> {
+    let mut res = Vec::new();
+
+    for ast in list[1..].iter() {
+        let val = eval_ast(ast, env.clone())?;
+        res.push(val);
+    }
+
+    Ok(ASTNode::DataList(res))
+}
+
+fn eval_lambda_def(
+    list: &Rc<Vec<ASTNode>>,
+    env: Rc<RefCell<Scope>>,
+) -> Result<ASTNode, CompileError> {
+    if list.len() != 3 {
+        return Err(CompileError::Syntax(
+            "Invalid syntax for lambda function definition".to_string(),
+        ));
+    }
+
+    let params = match &list[1] {
+        ASTNode::List(l) => {
+            let mut new_params = Vec::new();
+
+            for p in l.iter() {
+                match p {
+                    ASTNode::Symbol(s) => new_params.push(s.clone()),
+                    _ => return Err(CompileError::UnexpectedNode),
+                }
+            }
+
+            new_params
+        }
+        _ => return Err(CompileError::UnexpectedNode),
+    };
+
+    let body = match &list[2] {
+        ASTNode::List(l) => l.clone(),
+        _ => return Err(CompileError::UnexpectedNode),
+    };
+
+    Ok(ASTNode::Lambda(params, Rc::new(body.to_vec()), env.clone()))
+}
+
+fn eval_map(list: &Rc<Vec<ASTNode>>, env: Rc<RefCell<Scope>>) -> Result<ASTNode, CompileError> {
+    if list.len() != 3 {
+        return Err(CompileError::Syntax(
+            "Invalid syntax for 'map' function".to_string(),
+        ));
+    }
+
+    let closure = eval_ast(&list[1], env.clone())?;
+    let try_args = eval_ast(&list[2], env.clone())?;
+
+    let (params, body, closure_env) = match closure {
+        ASTNode::Lambda(p, b, e) => {
+            if p.len() != 1 {
+                return Err(CompileError::WrongParamNumber("map method".to_string()));
+            }
+
+            (p, b, e)
+        }
+        _ => return Err(CompileError::UnexpectedNode),
+    };
+
+    let args = match try_args {
+        ASTNode::DataList(l) => l.clone(),
+        _ => return Err(CompileError::UnexpectedNode),
+    };
+    let mut res = Vec::new();
+
+    for arg in args.iter() {
+        let val = eval_ast(arg, env.clone())?;
+        let new_scope = Rc::new(RefCell::new(Scope::from(closure_env.clone())));
+        new_scope.borrow_mut().set(&params[0], val);
+
+        let final_val = eval_ast(&ASTNode::List(body.clone()), new_scope.clone())?;
+        res.push(final_val);
+    }
+
+    Ok(ASTNode::DataList(res))
+}
+
+fn eval_filter(list: &Rc<Vec<ASTNode>>, env: Rc<RefCell<Scope>>) -> Result<ASTNode, CompileError> {
+    if list.len() != 3 {
+        return Err(CompileError::Syntax(
+            "Invalid syntax for 'filter' function".to_string(),
+        ));
+    }
+
+    let closure = eval_ast(&list[1], env.clone())?;
+    let try_args = eval_ast(&list[2], env.clone())?;
+
+    let (params, body, closure_env) = match closure {
+        ASTNode::Lambda(p, b, e) => {
+            if p.len() != 1 {
+                return Err(CompileError::WrongParamNumber("filter method".to_string()));
+            }
+
+            (p, b, e)
+        }
+        _ => return Err(CompileError::UnexpectedNode),
+    };
+
+    let args = match try_args {
+        ASTNode::List(l) => l.clone(),
+        _ => return Err(CompileError::UnexpectedNode),
+    };
+    let mut res = Vec::new();
+
+    for arg in args.iter() {
+        let val = eval_ast(arg, env.clone())?;
+        let new_scope = Rc::new(RefCell::new(Scope::from(closure_env.clone())));
+        new_scope.borrow_mut().set(&params[0], val.clone());
+
+        let final_val = eval_ast(&ASTNode::List(body.clone()), new_scope.clone())?;
+
+        match final_val {
+            ASTNode::Bool(b) => {
+                if b {
+                    res.push(val)
+                }
+            }
+            _ => {
+                return Err(CompileError::TypeMismatch(
+                    "lambda func in filter".to_string(),
+                ))
+            }
+        }
+    }
+
+    Ok(ASTNode::DataList(res))
+}
+
+fn eval_begin(list: &Rc<Vec<ASTNode>>, env: Rc<RefCell<Scope>>) -> Result<ASTNode, CompileError> {
+    let mut res = ASTNode::Void;
+    let new_env = Rc::new(RefCell::new(Scope::from(env.clone())));
+
+    for ast in list[1..].iter() {
+        res = eval_ast(ast, new_env.clone())?;
+    }
+
+    Ok(res)
+}
+
+fn eval_define(list: &Rc<Vec<ASTNode>>, env: Rc<RefCell<Scope>>) -> Result<ASTNode, CompileError> {
+    if list.len() != 3 {
+        return Err(CompileError::Syntax(
+            "Invalid syntax for 'define' expression".to_string(),
+        ));
+    }
+
+    match &list[1] {
+        ASTNode::Symbol(s) => {
+            let val = eval_ast(&list[2], env.clone())?;
+            env.borrow_mut().set(&s, val);
+        }
+        ASTNode::List(l) => {
+            let var = match &l[0] {
+                ASTNode::Symbol(s) => s.clone(),
+                _ => return Err(CompileError::UnexpectedNode),
+            };
+            let params = ASTNode::List(Rc::new(l[1..].to_vec()));
+            let body = list[2].clone();
+
+            let lambda_conf = vec![ASTNode::Void, params, body];
+            let lambda_def = eval_lambda_def(&Rc::new(lambda_conf), env.clone())?;
+            env.borrow_mut().set(&var, lambda_def);
+        }
+        _ => return Err(CompileError::UnexpectedNode),
+    }
+
+    Ok(ASTNode::Void)
 }
