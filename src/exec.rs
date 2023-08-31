@@ -420,7 +420,7 @@ fn eval_filter(list: &Rc<Vec<ASTNode>>, env: Rc<RefCell<Scope>>) -> Result<ASTNo
     };
 
     let args = match try_args {
-        ASTNode::List(l) => l.clone(),
+        ASTNode::DataList(l) => l.clone(),
         _ => return Err(CompileError::UnexpectedNode),
     };
     let mut res = Vec::new();
@@ -430,12 +430,12 @@ fn eval_filter(list: &Rc<Vec<ASTNode>>, env: Rc<RefCell<Scope>>) -> Result<ASTNo
         let new_scope = Rc::new(RefCell::new(Scope::from(closure_env.clone())));
         new_scope.borrow_mut().set(&params[0], val.clone());
 
-        let final_val = eval_ast(&ASTNode::List(body.clone()), new_scope.clone())?;
+        let boolean_check = eval_ast(&ASTNode::List(body.clone()), new_scope.clone())?;
 
-        match final_val {
+        match boolean_check {
             ASTNode::Bool(b) => {
                 if b {
-                    res.push(val)
+                    res.push(val.clone());
                 }
             }
             _ => {
@@ -652,5 +652,101 @@ mod tests {
         let env = Rc::new(RefCell::new(Scope::new()));
         let result = exec("(or (> 3 5) (> 1 3))", env).unwrap();
         assert_eq!(result, ASTNode::Bool(false));
+    }
+
+    #[test]
+    fn test_quadratic_eq() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define a 2)
+                (define b 4)
+                (define c 1)
+                (define x -3)
+                (+ (+ (* a (* x x)) (* b x)) c)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Int(7));
+    }
+
+    #[test]
+    fn test_lambda_quadratic_eq() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define qdr (lambda (a b c x) (+ (+ (* a (* x x)) (* b x)) c)))
+                (qdr 2 4 1 -3)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Int(7));
+    }
+
+    #[test]
+    fn test_lambda_closure_quadratic_eq() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define a 2)
+                (define b 4)
+                (define c 1)
+                (define qdr (lambda (x) (+ (+ (* a (* x x)) (* b x)) c)))
+                (qdr -3)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Int(7));
+    }
+
+    #[test]
+    fn test_map() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define fn (lambda (el) (* 2 el)))
+                (define l (list 1 3 5 7 9))
+                (map fn l)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(
+            res,
+            ASTNode::DataList(vec![
+                ASTNode::Int(2),
+                ASTNode::Int(6),
+                ASTNode::Int(10),
+                ASTNode::Int(14),
+                ASTNode::Int(18),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_filer() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define fn (lambda (el) (= 0 (% el 2))))
+                (define l (list 1 2 3 4 5 6 7 8 9 10))
+                (filter fn l)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(
+            res,
+            ASTNode::DataList(vec![
+                ASTNode::Int(2),
+                ASTNode::Int(4),
+                ASTNode::Int(6),
+                ASTNode::Int(8),
+                ASTNode::Int(10),
+            ])
+        );
     }
 }
