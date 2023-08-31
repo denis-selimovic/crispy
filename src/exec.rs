@@ -489,3 +489,168 @@ fn eval_define(list: &Rc<Vec<ASTNode>>, env: Rc<RefCell<Scope>>) -> Result<ASTNo
 
     Ok(ASTNode::Void)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_op() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(+ 3 9)", env).unwrap();
+        assert_eq!(result, ASTNode::Int(12));
+    }
+
+    #[test]
+    fn test_mult_op() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(* 11 4)", env).unwrap();
+        assert_eq!(result, ASTNode::Int(44));
+    }
+
+    #[test]
+    fn test_str_eq_1() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(= \"Alice\" \"Bob\")", env).unwrap();
+        assert_eq!(result, ASTNode::Bool(false));
+    }
+
+    #[test]
+    fn test_str_eq_2() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(= \"Bob\" \"Bob\")", env).unwrap();
+        assert_eq!(result, ASTNode::Bool(true));
+    }
+
+    #[test]
+    fn test_string_concat() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (
+                (define names \"Alice Bob Charlie Delta \")
+                (define surnames \"Alyson Bobbie\")
+                (+ names surnames)
+            )
+        ";
+
+        let result = exec(prog, env).unwrap();
+        assert_eq!(
+            result,
+            ASTNode::List(Rc::new(vec![ASTNode::String(
+                "Alice Bob Charlie Delta Alyson Bobbie".to_string()
+            )]))
+        );
+    }
+
+    #[test]
+    fn test_int_gt() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(> 1 3)", env).unwrap();
+        assert_eq!(result, ASTNode::Bool(false));
+    }
+
+    #[test]
+    fn test_int_float_gt() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(> 10 3.14)", env).unwrap();
+        assert_eq!(result, ASTNode::Bool(true));
+    }
+
+    #[test]
+    fn test_int_lt() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(< 1 3)", env).unwrap();
+        assert_eq!(result, ASTNode::Bool(true));
+    }
+
+    #[test]
+    fn test_int_float_lt() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(< 4 3.14)", env).unwrap();
+        assert_eq!(result, ASTNode::Bool(false));
+    }
+
+    #[test]
+    fn test_mod_1() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(% 10 2)", env).unwrap();
+        assert_eq!(result, ASTNode::Int(0));
+    }
+
+    #[test]
+    fn test_mod_2() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(% 42.0 22.0)", env).unwrap();
+        assert_eq!(result, ASTNode::Float(20.0));
+    }
+
+    #[test]
+    fn test_neq_1() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(!= 10 10)", env).unwrap();
+        assert_eq!(result, ASTNode::Bool(false));
+    }
+
+    #[test]
+    fn test_neq_2() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(!= 10 2)", env).unwrap();
+        assert_eq!(result, ASTNode::Bool(true));
+    }
+
+    #[test]
+    fn test_neq_3() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(!= 3.14 2.11)", env).unwrap();
+        assert_eq!(result, ASTNode::Bool(true));
+    }
+
+    #[test]
+    fn test_neq_4() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(!= \"Bob\" \"Charlie\")", env).unwrap();
+        assert_eq!(result, ASTNode::Bool(true));
+    }
+
+    #[test]
+    fn test_and_both() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(and (< 3 5) (< 2 4))", env).unwrap();
+        assert_eq!(result, ASTNode::Bool(true));
+    }
+
+    #[test]
+    fn test_and_one() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(and (< 3 5) (> 2 4))", env).unwrap();
+        assert_eq!(result, ASTNode::Bool(false));
+    }
+
+    #[test]
+    fn test_and_none() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(and (> 1 4) (> 10 100.1))", env).unwrap();
+        assert_eq!(result, ASTNode::Bool(false));
+    }
+
+    #[test]
+    fn test_or_both() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(or (< 3 5) (< 2 4))", env).unwrap();
+        assert_eq!(result, ASTNode::Bool(true));
+    }
+
+    #[test]
+    fn test_or_one() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(or (< 3 5) (> 2 4))", env).unwrap();
+        assert_eq!(result, ASTNode::Bool(true));
+    }
+
+    #[test]
+    fn test_or_none() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let result = exec("(or (> 3 5) (> 1 3))", env).unwrap();
+        assert_eq!(result, ASTNode::Bool(false));
+    }
+}
