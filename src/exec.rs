@@ -727,7 +727,7 @@ mod tests {
     }
 
     #[test]
-    fn test_filer() {
+    fn test_filter() {
         let env = Rc::new(RefCell::new(Scope::new()));
         let prog = "
             (begin
@@ -748,5 +748,408 @@ mod tests {
                 ASTNode::Int(10),
             ])
         );
+    }
+
+    #[test]
+    fn test_car() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define l (list 1 2 3 4 5 6 7 8 9 10))
+                (car l)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Int(1));
+    }
+
+    #[test]
+    fn test_cdr() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define l (list 1 2 3 4 5))
+                (cdr l)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(
+            res,
+            ASTNode::DataList(vec![
+                ASTNode::Int(2),
+                ASTNode::Int(3),
+                ASTNode::Int(4),
+                ASTNode::Int(5),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_length() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define l (list 1 2 3 4 5 6 7 8 9 10))
+                (length l)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Int(10));
+    }
+
+    #[test]
+    fn test_is_null_false() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define l (list 1 2 3 4 5 6 7 8 9 10))
+                (null? l)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Bool(false));
+    }
+
+    #[test]
+    fn test_is_null_true() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define l (list))
+                (null? l)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Bool(true));
+    }
+
+    #[test]
+    fn test_create_list() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define l (list 1 2 3 4 5))
+                l
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(
+            res,
+            ASTNode::DataList(vec![
+                ASTNode::Int(1),
+                ASTNode::Int(2),
+                ASTNode::Int(3),
+                ASTNode::Int(4),
+                ASTNode::Int(5),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_create_list_empty() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define l (list))
+                l
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::DataList(vec![]));
+    }
+
+    #[test]
+    fn test_print_list() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define l (list 1 2 3 4 5))
+                (print l)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Void);
+    }
+
+    #[test]
+    fn test_inline_lambda() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                ((lambda (x y) (+ x y)) 10 20)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Int(30));
+    }
+
+    #[test]
+    fn test_lambda_with_lambda_return() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define mltn
+                    (lambda (n)
+                        (lambda (x) (* x n))))
+                (define mlt2 (mltn 2))
+                (mlt2 20)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Int(40));
+    }
+
+    #[test]
+    fn test_lambda_recursive() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define factorial
+                    (lambda (n)
+                        (if (= n 1) 1
+                            (* n (factorial (- n 1))))))
+                (factorial 5)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Int(120));
+    }
+
+    #[test]
+    fn test_lambda_tail_recursive() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define fib
+                  (lambda (n a b) 
+                     (if (= n 0) a 
+                       (if (= n 1) b 
+                          (fib (- n 1) b (+ a b))))))
+                  
+                (fib 6 0 1)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Int(8));
+    }
+
+    #[test]
+    fn test_circle_area_float_result() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define pi 3.14)
+                (define r 1)
+                (define sqr (lambda (r) (* r r)))
+                (define (area r) (* pi (sqr r)))
+                (area r)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Float(3.14));
+    }
+
+    #[test]
+    fn test_function_define() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define (triple val) (* 3 val))
+                (define (twice fn val) (fn (fn val)))
+                (twice triple 5)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Int(45));
+    }
+
+    #[test]
+    fn test_scope_with_begin_always_last_1() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define x 10)
+                (define y 20)
+                (define z 30)
+                (begin
+                    (define x 100)
+                    (define y 200)
+                    (define z 300)
+                    (list x y z)
+                )
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(
+            res,
+            ASTNode::DataList(vec![
+                ASTNode::Int(100),
+                ASTNode::Int(200),
+                ASTNode::Int(300),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_scope_with_begin_always_last_2() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define i 10)
+                (begin
+                    (define i 20)
+                    i
+                )
+                i
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Int(10));
+    }
+
+    #[test]
+    fn test_if_with_signum_1() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define (signum n)
+                    (if (> n 0) 1
+                        (if (< n 0) -1 0)))
+                (signum -5)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Int(-1));
+    }
+
+    #[test]
+    fn test_if_with_signum_2() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define (signum n)
+                    (if (> n 0) 1
+                        (if (< n 0) -1 0)))
+                (signum 10)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Int(1));
+    }
+
+    #[test]
+    fn test_if_with_signum_3() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define (signum n)
+                    (if (> n 0) 1
+                        (if (< n 0) -1 0)))
+                (signum 0)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Int(0));
+    }
+
+    #[test]
+    fn test_symbol_1() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define t #t)
+                t
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Bool(true));
+    }
+
+    #[test]
+    fn test_symbol_2() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define f #f)
+                f
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Bool(false));
+    }
+
+    #[test]
+    fn test_symbol_3() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define n #nil)
+                n
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Void);
+    }
+
+    #[test]
+    fn test_symbol_4() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (define n 2.17)
+                n
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Float(2.17));
+    }
+
+    #[test]
+    fn test_if_simple_true_cond() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (if (< 2 3) -2 -3)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Int(-2));
+    }
+
+    #[test]
+    fn test_if_simple_false_cond() {
+        let env = Rc::new(RefCell::new(Scope::new()));
+        let prog = "
+            (begin
+                (if (> 2 3) -2 -3)
+            )
+        ";
+
+        let res = exec(prog, env).unwrap();
+        assert_eq!(res, ASTNode::Int(-3));
     }
 }
