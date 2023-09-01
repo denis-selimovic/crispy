@@ -26,8 +26,8 @@ pub fn interpreter<B: BufRead>(reader: &mut B) {
                 }
 
                 match exec(&l, scope.clone()) {
-                    Err(e) => println!("err: {}", e.to_string()),
-                    Ok(ast) => println!("lisp-scheme>> {}", ast),
+                    Err(e) => println!("err >> {}", e.to_string()),
+                    Ok(ast) => println!("lisp >> {}", ast),
                 }
             }
             Err(e) => {
